@@ -13,7 +13,7 @@ type Server struct {
 func CreateNewServer(config *config.Config, handler http.Handler) *Server {
 	return &Server{
 		httpServer: &http.Server{
-			Addr: ":" + config.HTTP.Port,
+			Addr:           ":" + config.HTTP.Port,
 			Handler:        handler,
 			ReadTimeout:    config.HTTP.ReadTimeout,
 			WriteTimeout:   config.HTTP.WriteTimeout,
@@ -29,4 +29,3 @@ func (s *Server) Run() error {
 func (s *Server) Stop(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
-

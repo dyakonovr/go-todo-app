@@ -8,40 +8,43 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"todo-app/internal/api"
+	todosapi "todo-app/internal/api/todosApi"
 	"todo-app/internal/config"
-	delivery "todo-app/internal/delivery/http"
-	"todo-app/internal/repository"
+	"todo-app/internal/repo/todosRepo"
 	"todo-app/internal/server"
-	"todo-app/internal/service"
+	todosusecase "todo-app/internal/usecase/todosUsecase"
 	"todo-app/pkg/logger"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Run(configDir string, configName string) {
+	ctx := context.Background()
 	logger.Init()
 
 	cfg, err := config.Init(configDir, configName)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Errorf("Error while compiling config: %v", err.Error())
 		return
 	}
 
 	// Connection to database
-	conn, err := pgx.Connect(context.Background(), cfg.Postgres.URI)
+	pool, err := pgxpool.New(ctx, cfg.Postgres.URI)
 	if err != nil {
 		logger.Errorf("Unable to connect to database: %v\n", err)
 		return
 	}
-	defer conn.Close(context.Background())
 
-	// Create repos, services, handler
-	repos := repository.NewRepositories(conn)
-	services := service.NewService(service.Deps{Repos: repos})
-	handlers := delivery.NewHandler(services)
+	defer pool.Close()
+
+	// Create repos, services, apis
+	todosRepo := todosRepo.New(pool)
+	todosUsecase := todosusecase.New(todosRepo)
+	todosApi := todosapi.New(todosUsecase)
 
 	// HTTP Server
-	server := server.CreateNewServer(cfg, handlers.Init())
+	server := server.CreateNewServer(cfg, api.Init([]api.ApiInterface{todosApi}))
 
 	go func() {
 		if err := server.Run(); !errors.Is(err, http.ErrServerClosed) {
@@ -59,11 +62,10 @@ func Run(configDir string, configName string) {
 
 	const timeout = 5 * time.Second
 
-	ctx, shutdown := context.WithTimeout(context.Background(), timeout)
+	ctx, shutdown := context.WithTimeout(ctx, timeout)
 	defer shutdown()
 
 	if err := server.Stop(ctx); err != nil {
 		logger.Errorf("failed to stop server: %v", err)
 	}
 }
-

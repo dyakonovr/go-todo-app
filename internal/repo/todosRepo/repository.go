@@ -1,18 +1,17 @@
-package repository
+package todosRepo
 
 import (
 	"context"
-	"todo-app/internal/domain"
 	"todo-app/pkg/logger"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type TodosRepository struct {
-	connection *pgx.Conn
+type Repository struct {
+	connection *pgxpool.Pool
 }
 
-func NewTodosRepo(connection *pgx.Conn) *TodosRepository {
+func New(connection *pgxpool.Pool) *Repository {
 	connection.Exec(
 		context.Background(),
 		`
@@ -24,13 +23,13 @@ func NewTodosRepo(connection *pgx.Conn) *TodosRepository {
 		);
 	`)
 
-	return &TodosRepository{
+	return &Repository{
 		connection: connection,
 	}
 }
 
-func (repo *TodosRepository) Create(ctx context.Context, todo domain.Todo) (domain.Todo, error) {
-	var newTodo domain.Todo
+func (repo *Repository) Create(ctx context.Context, todo Todo) (Todo, error) {
+	var newTodo Todo
 	err := repo.connection.QueryRow(
 		ctx,
 		"INSERT INTO todos (name) VALUES ($1) RETURNING id, name, is_completed, created_at",
@@ -39,29 +38,34 @@ func (repo *TodosRepository) Create(ctx context.Context, todo domain.Todo) (doma
 	return newTodo, err
 }
 
-func (repo *TodosRepository) GetAll(ctx context.Context, page int, perPage int) ([]domain.Todo, error) {
-	var todos []domain.Todo
-	rows, err := repo.connection.Query(ctx, "SELECT * FROM todos LIMIT $1 OFFSET $2", perPage, (page-1)*perPage)
+func (repo *Repository) GetAll(ctx context.Context, page int, perPage int) ([]Todo, int, error) {
+	var todos []Todo
+	rows, err := repo.connection.Query(ctx, "SELECT * FROM todoss LIMIT $1 OFFSET $2", perPage, (page-1)*perPage)
 	if err != nil {
-		return todos, err
+		return todos, -1, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var todo domain.Todo
+		var todo Todo
 		err = rows.Scan(&todo.ID, &todo.Name, &todo.IsCompleted, &todo.CreatedAt)
 		if err != nil {
 			logger.Errorf("Row scan failed in GetAll Todos: %v", err)
-			return todos, err
+			return todos, -1, err
 		}
 		todos = append(todos, todo)
 	}
 
-	return todos, err
+	var count int
+	err = repo.connection.QueryRow(
+		ctx,
+		"SELECT COUNT(*) FROM todos").Scan(&count)
+
+	return todos, count, err
 }
 
-func (repo *TodosRepository) Update(ctx context.Context, id int, todo domain.Todo) (domain.Todo, error) {
-	var updatedTodo domain.Todo
+func (repo *Repository) Update(ctx context.Context, id int, todo Todo) (Todo, error) {
+	var updatedTodo Todo
 	err := repo.connection.QueryRow(
 		ctx,
 		`
@@ -73,7 +77,7 @@ func (repo *TodosRepository) Update(ctx context.Context, id int, todo domain.Tod
 	return updatedTodo, err
 }
 
-func (repo *TodosRepository) Delete(ctx context.Context, id int) error {
+func (repo *Repository) Delete(ctx context.Context, id int) error {
 	_, err := repo.connection.Exec(
 		ctx,
 		"DELETE FROM todos WHERE id = $1",
@@ -81,5 +85,3 @@ func (repo *TodosRepository) Delete(ctx context.Context, id int) error {
 
 	return err
 }
-
-

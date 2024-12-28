@@ -1,4 +1,4 @@
-package domain
+package todosRepo
 
 import "time"
 
@@ -8,4 +8,3 @@ type Todo struct {
 	IsCompleted bool      `json:"isCompleted"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
-

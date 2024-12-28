@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	defaultHTTPPort           = 8000
-	defaultHTTPMaxHeaderBytes = 1
-	defaultHTTPReadTimeout    = time.Second * 10
-	defaultHTTPWriteTimeout   = time.Second * 10
+	defaultHTTPPort               = 8000
+	defaultHTTPMaxHeaderMegabytes = 1
+	defaultHTTPReadTimeout        = time.Second * 10
+	defaultHTTPWriteTimeout       = time.Second * 10
 )
 
 type Config struct {
@@ -81,8 +81,7 @@ func setFromEnv(cfg *Config) {
 
 func setDefaultConfigValues() {
 	viper.SetDefault("http.host", defaultHTTPPort)
-	viper.SetDefault("http.maxHeaderBytes", defaultHTTPMaxHeaderBytes)
+	viper.SetDefault("http.maxHeaderMegabytes", defaultHTTPMaxHeaderMegabytes)
 	viper.SetDefault("http.readTimeout", defaultHTTPReadTimeout)
 	viper.SetDefault("http.writeTimeout", defaultHTTPWriteTimeout)
 }
-
